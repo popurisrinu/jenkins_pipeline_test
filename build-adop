@@ -1,0 +1,260 @@
+pipeline {
+    
+    agent any
+    environment{
+        HELM_EXPERIMENTAL_OCI = 1
+        
+    }
+   
+    stages {
+     stage ('Code checkout') {
+         steps {
+                script {
+                    if(AWS_Region == 'none'){
+                        currentBuild.result = 'ABORTED'
+                        error('AWS_Region not selected')
+                    }
+                    git branch: '${BRANCH_NAME}', credentialsId: 'adop-jenkins-git-credentials-id' , url: 'https://speddaiah@bitbucket.org/automative-data-orchestration-platform/adop.git'
+               }
+           }
+       }
+	   stage('To update the configuration files') {
+            steps {
+                dir('provisioner/adop-set-config') {
+                    sh  'ansible-playbook create-properties-stack.yml -e "region=\'${AWS_Region}\'"'
+                }
+            }
+        }
+        stage('Maven Build') {
+            steps {
+                dir('build') {
+                    sh " mvn clean install"
+                }
+            }
+        }        
+        stage('ng build') {
+            steps {
+                dir('adop-ui/adop-admin') {
+                    sh  ''' 
+                         npm install
+                         ng build
+                        '''
+                           
+                }
+            }
+        }        
+        stage('docker adop-ui build, tag and push') {
+            steps {
+                dir('adop-ui') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo docker build -t adop/ui .
+                         sudo docker tag adop/ui:latest 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/ui:latest
+                         sudo docker push 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/ui:latest
+                        '''
+                }
+            }
+        }
+        stage('docker adop-kafka-publisher build, tag and push') {
+            steps {
+                dir('adop-kafka-publisher') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo docker build -t adop/publisher .
+                         sudo docker tag adop/publisher:latest 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/publisher:latest
+                         sudo docker push 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/publisher:latest
+                        '''
+                }
+            }
+        }
+        stage('docker app build, tag and push') {
+            steps {
+                dir('app') {
+                    sh  ''' 
+                         aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo docker build -t adop/app .
+                         sudo docker tag adop/app:latest 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/app:latest
+                         sudo docker push 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/app:latest
+                        '''
+                }
+            }
+        }
+        stage('docker kafka-subscriber build, tag and push') {
+            steps {
+                dir('adop-kafka-subscriber') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo docker build -t adop/subscriber .
+                         sudo docker tag adop/subscriber:latest 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/subscriber:latest
+                         sudo docker push 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/subscriber:latest
+                        '''
+                }
+            }
+        }
+         stage('docker analytics build, tag and push') {
+            steps {
+                dir('adop-analytics') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo docker build -t adop/analytics .
+                         sudo docker tag adop/analytics:latest 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/analytics:latest
+                         sudo docker push 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/analytics:latest
+                        '''
+                }
+            }
+        }
+        stage('docker adop-app-event-bridge build, tag and push') {
+            steps {
+                dir('adop-app-event-bridge') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo docker build -t adop/app-event-bridge .
+                         sudo docker tag adop/app-event-bridge:latest 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/app-event-bridge:latest
+                         sudo docker push 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/app-event-bridge:latest
+                        '''
+                }
+            }
+        }
+        
+        stage('docker adop-activemq-publisher build, tag and push') {
+            steps {
+                dir('adop-activemq-publisher') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo docker build -t adop/activemq-publisher .
+                         sudo docker tag adop/activemq-publisher:latest 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/activemq-publisher:latest
+                         sudo docker push 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/activemq-publisher:latest
+                        '''
+                }
+            }
+        }
+        stage('docker adop-activemq-subscriber build, tag and push') {
+            steps {
+                dir('adop-activemq-subscriber') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo docker build -t adop/activemq-subscriber .
+                         sudo docker tag adop/activemq-subscriber:latest 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/activemq-subscriber:latest
+                         sudo docker push 589905902211.dkr.ecr.us-west-2.amazonaws.com/adop/activemq-subscriber:latest
+                        '''
+                }
+            }
+        }
+        stage ('To remove the docker images') {
+            steps {
+                script {
+                    sh "sudo docker image prune -a --force"
+                }
+            }
+        }
+        stage('adop-ui helm save, tag and push') {
+            steps {
+                dir('helm/adop-ui') {
+                    sh  '''  
+                         aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo helm package .
+                         a=`grep "version:" Chart.yaml | cut -d ' ' -f2`
+                         helm push ./ui-chart-$a.tgz oci://589905902211.dkr.ecr.us-west-2.amazonaws.com/adop
+                        '''
+            }
+          }
+        }
+
+        stage('app helm save, tag and push') {
+            steps {
+                dir('helm/app') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo helm package .
+                         a=`grep "version:" Chart.yaml | cut -d ' ' -f2`
+                         helm push ./app-chart-$a.tgz oci://589905902211.dkr.ecr.us-west-2.amazonaws.com/adop
+                        '''
+                }
+            }
+        }
+        stage('kafka-publisher helm save, tag and push') {
+            steps {
+                dir('helm/kafka-publisher') {
+                    sh  '''
+                         aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo helm package .
+                         a=`grep "version:" Chart.yaml | cut -d ' ' -f2`
+                         helm push ./publisher-chart-$a.tgz oci://589905902211.dkr.ecr.us-west-2.amazonaws.com/adop
+                        '''
+                }
+            }
+        }
+
+        stage('kafka-subscriber helm save, tag and push') {
+            steps {
+                dir('helm/kafka-subscriber') {
+                    sh  ''' 
+                         aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo helm package .
+                         a=`grep "version:" Chart.yaml | cut -d ' ' -f2`
+                         helm push ./subscriber-chart-$a.tgz oci://589905902211.dkr.ecr.us-west-2.amazonaws.com/adop
+                        '''
+                }
+            }
+        }
+        
+        stage('adop-analytics helm save, tag and push') {
+            steps {
+                dir('helm/adop-analytics') {
+                    sh  ''' 
+                         aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo helm package .
+                         a=`grep "version:" Chart.yaml | cut -d ' ' -f2`
+                         helm push ./analytics-chart-$a.tgz oci://589905902211.dkr.ecr.us-west-2.amazonaws.com/adop
+                        '''
+                }
+            }
+        }
+        stage('adop-app-event-bridge helm save, tag and push') {
+            steps {
+                dir('helm/adop-app-event-bridge') {
+                    sh  ''' 
+                         aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo helm package .
+                         a=`grep "version:" Chart.yaml | cut -d ' ' -f2`
+                         helm push ./app-event-bridge-chart-$a.tgz oci://589905902211.dkr.ecr.us-west-2.amazonaws.com/adop
+                        '''
+                }
+            }
+        }
+        
+     stage('adop-activemq-publisher helm save, tag and push') {
+            steps {
+                dir('helm/adop-activemq-publisher') {
+                    sh  ''' 
+                         aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo helm package .
+                         a=`grep "version:" Chart.yaml | cut -d ' ' -f2`
+                         helm push ./activemq-publisher-chart-$a.tgz oci://589905902211.dkr.ecr.us-west-2.amazonaws.com/adop
+                        '''
+                }
+            }
+        }
+    stage('adop-activemq-subscriber helm save, tag and push') {
+            steps {
+                dir('helm/adop-activemq-subscriber') {
+                    sh  ''' 
+                         aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin 589905902211.dkr.ecr.us-west-2.amazonaws.com
+                         sudo helm package .
+                         a=`grep "version:" Chart.yaml | cut -d ' ' -f2`
+                         helm push ./activemq-subscriber-chart-$a.tgz oci://589905902211.dkr.ecr.us-west-2.amazonaws.com/adop
+                        '''
+                }
+            }
+        }
+    }
+    post {
+        always {
+            // Email Notification after build
+            emailext body: "<br><b>Status:</b> ${currentBuild.currentResult}</br> <br><b>Job Name:</b> ${env.JOB_NAME}</br> <br><b>Build Number:</b> ${env.BUILD_NUMBER}</br> <br><b>More information at:</b>  ${BUILD_URL}</br>",subject: 'Declarative Pipeline Build Status',to: 'jenkins.devops@amantyatech.com'
+            // Clean after build
+            cleanWs deleteDirs: true, notFailBuild: true
+        }
+    }
+}
+
